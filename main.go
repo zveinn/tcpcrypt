@@ -113,18 +113,18 @@ func NewPublicKeyFromBytes(b []byte) (PK *ecdh.PublicKey, err error) {
 	return
 }
 
-type TCPEncryptWrapper struct {
+type SocketWrapper struct {
 	SOCKET   net.Conn
 	LocalPK  *ecdh.PrivateKey
 	RemotePK *ecdh.PublicKey
 	SEAL     *SEAL
 }
 
-func NewTCPEncryptWrapper(
+func NewSocketWrapper(
 	SOCKET net.Conn,
 	encryptionType EncType,
-) (T *TCPEncryptWrapper, err error) {
-	T = new(TCPEncryptWrapper)
+) (T *SocketWrapper, err error) {
+	T = new(SocketWrapper)
 	T.SOCKET = SOCKET
 	T.SEAL = new(SEAL)
 	T.SEAL.Created = time.Now()
@@ -133,7 +133,7 @@ func NewTCPEncryptWrapper(
 	return
 }
 
-func (T *TCPEncryptWrapper) InitHandshake() (err error) {
+func (T *SocketWrapper) InitHandshake() (err error) {
 	err = T.sendPublicKey()
 	if err != nil {
 		return
@@ -150,7 +150,7 @@ func (T *TCPEncryptWrapper) InitHandshake() (err error) {
 	return
 }
 
-func (T *TCPEncryptWrapper) ReceiveHandshake() (err error) {
+func (T *SocketWrapper) ReceiveHandshake() (err error) {
 	err = T.receivePublicKey()
 	if err != nil {
 		return
@@ -167,7 +167,7 @@ func (T *TCPEncryptWrapper) ReceiveHandshake() (err error) {
 	return
 }
 
-func (T *TCPEncryptWrapper) Read(encryptedReceiver []byte, decrypterReceiver []byte) (n int, outputBuffer []byte, err error) {
+func (T *SocketWrapper) Read(encryptedReceiver []byte, decrypterReceiver []byte) (n int, outputBuffer []byte, err error) {
 	n, err = T.SOCKET.Read(encryptedReceiver[0:2])
 	if err != nil {
 		return
@@ -183,17 +183,17 @@ func (T *TCPEncryptWrapper) Read(encryptedReceiver []byte, decrypterReceiver []b
 	return
 }
 
-func (T *TCPEncryptWrapper) Write(outputBuffer []byte, data []byte, dataLength int) (n int, err error) {
+func (T *SocketWrapper) Write(outputBuffer []byte, data []byte, dataLength int) (n int, err error) {
 	outputBuffer[0] = byte(dataLength >> 8)
 	outputBuffer[1] = byte(dataLength)
 	return T.SOCKET.Write(T.SEAL.AEAD.Seal(outputBuffer[:2], T.SEAL.Nonce, data, nil))
 }
 
-func (T *TCPEncryptWrapper) computeSharedKey() (err error) {
+func (T *SocketWrapper) computeSharedKey() (err error) {
 	return T.SEAL.ECDH()
 }
 
-func (T *TCPEncryptWrapper) sendPublicKey() (err error) {
+func (T *SocketWrapper) sendPublicKey() (err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -214,7 +214,7 @@ func (T *TCPEncryptWrapper) sendPublicKey() (err error) {
 	return
 }
 
-func (T *TCPEncryptWrapper) receivePublicKey() (err error) {
+func (T *SocketWrapper) receivePublicKey() (err error) {
 	defer func() {
 		r := recover()
 		if r != nil {

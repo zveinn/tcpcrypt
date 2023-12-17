@@ -29,7 +29,7 @@ func newListener(port string) {
 }
 
 func handleSocket(conn net.Conn) {
-	T, err := tcpcrypt.NewTCPEncryptWrapper(conn, tcpcrypt.AES256)
+	T, err := tcpcrypt.NewSocketWrapper(conn, tcpcrypt.AES256)
 	if err != nil {
 		fmt.Println("error making new wrapper for server ", err)
 		return
@@ -62,7 +62,7 @@ func newClient() {
 		fmt.Println("CANT DIAL!", err)
 	}
 
-	T, err := tcpcrypt.NewTCPEncryptWrapper(C1, tcpcrypt.AES256)
+	T, err := tcpcrypt.NewSocketWrapper(C1, tcpcrypt.AES256)
 	if err != nil {
 		fmt.Println("error making new wrapper for client ", err)
 		return
