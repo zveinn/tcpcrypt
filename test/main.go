@@ -76,11 +76,10 @@ func newClient() {
 	fmt.Println("CLIENT KEY:", T.SEAL.Key)
 
 	data := []byte("HELLO THIS IS ENCRYPTED FROM THE CLIENT HELLO THIS IS ENCRYPTED FROM THE CLIENT !!")
-	outBuffer := make([]byte, math.MaxUint16)
 
 	for {
 		time.Sleep(1 * time.Second)
-		_, err = T.Write(outBuffer, data, len(data))
+		_, err = T.Write(data)
 		if err != nil {
 			fmt.Println(err)
 		}

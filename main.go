@@ -118,6 +118,16 @@ type SocketWrapper struct {
 	LocalPK  *ecdh.PrivateKey
 	RemotePK *ecdh.PublicKey
 	SEAL     *SEAL
+
+	// This buffer will be populated with the outgoing
+	// encrypted data
+	outBuffer [66000]byte
+	outLen    int
+
+	// ...
+	encryptedReceiver [66000]byte
+	decryptedReceiver [66000]byte
+	inLen             int
 }
 
 func NewSocketWrapper(
@@ -167,26 +177,51 @@ func (T *SocketWrapper) ReceiveHandshake() (err error) {
 	return
 }
 
-func (T *SocketWrapper) Read(encryptedReceiver []byte, decrypterReceiver []byte) (n int, outputBuffer []byte, err error) {
-	n, err = T.SOCKET.Read(encryptedReceiver[0:2])
+func (T *SocketWrapper) Read() (n int, outputBuffer []byte, err error) {
+	_, err = T.SOCKET.Read(T.encryptedReceiver[0:2])
 	if err != nil {
 		return
 	}
 
-	n = int(encryptedReceiver[1]) | int(encryptedReceiver[0])<<8
-	n, err = io.ReadAtLeast(T.SOCKET, encryptedReceiver, n)
+	// fmt.Println("_____________________________________-")
+	// fmt.Println("xp:", &T.decryptedReceiver[0])
+	// fmt.Println("x:", &T.encryptedReceiver[0])
+
+	T.inLen = int(T.encryptedReceiver[1]) | int(T.encryptedReceiver[0])<<8
+	n, err = io.ReadAtLeast(T.SOCKET, T.encryptedReceiver[0:T.inLen], T.inLen)
 	if err != nil {
 		return
 	}
 
-	outputBuffer, err = T.SEAL.AEAD.Open(decrypterReceiver[:0], T.SEAL.Nonce, encryptedReceiver[:n], nil)
+	outputBuffer, err = T.SEAL.AEAD.Open(T.decryptedReceiver[:0], T.SEAL.Nonce, T.encryptedReceiver[:T.inLen], nil)
+
+	// fmt.Println("NONCE:", T.SEAL.Nonce)
+	// fmt.Println("N:", n)
+	// fmt.Println("Tin:", T.inLen)
+	// fmt.Println("lout:", len(outputBuffer))
+	// fmt.Println("pp:", &outputBuffer[0])
+	// fmt.Println("pp:", &T.decryptedReceiver[0])
+	// fmt.Println("pp:", &T.encryptedReceiver[0])
+	// fmt.Println("_____________________________________-")
 	return
 }
 
-func (T *SocketWrapper) Write(outputBuffer []byte, data []byte, dataLength int) (n int, err error) {
-	outputBuffer[0] = byte(dataLength >> 8)
-	outputBuffer[1] = byte(dataLength)
-	return T.SOCKET.Write(T.SEAL.AEAD.Seal(outputBuffer[:2], T.SEAL.Nonce, data, nil))
+func (T *SocketWrapper) Write(data []byte) (n int, err error) {
+	out := T.SEAL.AEAD.Seal(T.outBuffer[:2], T.SEAL.Nonce, data, nil)
+	T.outLen = len(out) - 2
+	out[0] = byte(T.outLen >> 8)
+	out[1] = byte(T.outLen)
+
+	// fmt.Println("_____________________________________-")
+	// fmt.Println("XX:")
+	// fmt.Println("NONCE:", T.SEAL.Nonce)
+	// fmt.Println(&T.outBuffer[0])
+	// fmt.Println(T.outBuffer[0:10])
+	// fmt.Println(&out[0])
+	// fmt.Println(out[0:10], "-", len(out))
+	// fmt.Println(binary.BigEndian.Uint16(out[0:2]))
+	// fmt.Println("_____________________________________-")
+	return T.SOCKET.Write(out)
 }
 
 func (T *SocketWrapper) computeSharedKey() (err error) {
