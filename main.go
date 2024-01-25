@@ -127,7 +127,7 @@ type SocketWrapper struct {
 	// ...
 	encryptedReceiver [66000]byte
 	decryptedReceiver [66000]byte
-	inLen             int
+	inLen             uint16
 }
 
 func NewSocketWrapper(
@@ -178,7 +178,7 @@ func (T *SocketWrapper) ReceiveHandshake() (err error) {
 }
 
 func (T *SocketWrapper) Read() (n int, outputBuffer []byte, err error) {
-	_, err = T.SOCKET.Read(T.encryptedReceiver[0:2])
+	_, err = io.ReadAtLeast(T.SOCKET, T.encryptedReceiver[0:2], 2)
 	if err != nil {
 		return
 	}
@@ -187,13 +187,15 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, err error) {
 	// fmt.Println("xp:", &T.decryptedReceiver[0])
 	// fmt.Println("x:", &T.encryptedReceiver[0])
 
-	T.inLen = int(T.encryptedReceiver[1]) | int(T.encryptedReceiver[0])<<8
-	n, err = io.ReadAtLeast(T.SOCKET, T.encryptedReceiver[0:T.inLen], T.inLen)
+	// T.inLen = int(T.encryptedReceiver[1]) | int(T.encryptedReceiver[0])<<8
+	T.inLen = binary.BigEndian.Uint16(T.encryptedReceiver[0:2])
+	// n, err = T.SOCKET.Read(T.encryptedReceiver[0:T.inLen])
+	n, err = io.ReadAtLeast(T.SOCKET, T.encryptedReceiver[0:T.inLen], int(T.inLen))
 	if err != nil {
 		return
 	}
 
-	outputBuffer, err = T.SEAL.AEAD.Open(T.decryptedReceiver[:0], T.SEAL.Nonce, T.encryptedReceiver[:T.inLen], nil)
+	outputBuffer, err = T.SEAL.AEAD.Open(T.decryptedReceiver[:0], T.SEAL.Nonce, T.encryptedReceiver[0:T.inLen], nil)
 
 	// fmt.Println("NONCE:", T.SEAL.Nonce)
 	// fmt.Println("N:", n)
@@ -209,8 +211,10 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, err error) {
 func (T *SocketWrapper) Write(data []byte) (n int, err error) {
 	out := T.SEAL.AEAD.Seal(T.outBuffer[:2], T.SEAL.Nonce, data, nil)
 	T.outLen = len(out) - 2
-	out[0] = byte(T.outLen >> 8)
-	out[1] = byte(T.outLen)
+	binary.BigEndian.PutUint16(out[0:2], uint16(T.outLen))
+
+	// out[0] = byte(T.outLen >> 8)
+	// out[1] = byte(T.outLen)
 
 	// fmt.Println("_____________________________________-")
 	// fmt.Println("XX:")
@@ -221,7 +225,8 @@ func (T *SocketWrapper) Write(data []byte) (n int, err error) {
 	// fmt.Println(out[0:10], "-", len(out))
 	// fmt.Println(binary.BigEndian.Uint16(out[0:2]))
 	// fmt.Println("_____________________________________-")
-	return T.SOCKET.Write(out)
+	n, err = T.SOCKET.Write(out)
+	return
 }
 
 func (T *SocketWrapper) computeSharedKey() (err error) {
