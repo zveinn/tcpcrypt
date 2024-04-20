@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -181,28 +182,28 @@ func (T *SocketWrapper) ReceiveHandshake() (err error) {
 }
 
 func (T *SocketWrapper) Read() (n int, outputBuffer []byte, control [2]byte, err error) {
+	fmt.Println("INGRESS__________________________________")
 	_, err = io.ReadAtLeast(
 		T.SOCKET,
 		T.encryptedReceiver[0:12],
 		12,
 	)
+	fmt.Println("1.BUFF:", T.encryptedReceiver[0:12])
 	if err != nil {
+		fmt.Println("first read")
 		return
 	}
 
-	// fmt.Println("_____________________________________-")
-	// fmt.Println("xp:", &T.decryptedReceiver[0])
-	// fmt.Println("x:", &T.encryptedReceiver[0])
-
-	// T.inLen = int(T.encryptedReceiver[1]) | int(T.encryptedReceiver[0])<<8
 	T.inLen = binary.BigEndian.Uint16(T.encryptedReceiver[0:2])
-	// n, err = T.SOCKET.Read(T.encryptedReceiver[0:T.inLen])
+	fmt.Println("LEN:", T.inLen)
 	n, err = io.ReadAtLeast(
 		T.SOCKET,
-		T.encryptedReceiver[12:T.inLen],
+		T.encryptedReceiver[12:T.inLen+12],
 		int(T.inLen),
 	)
+	fmt.Println("2.BUFF:", T.encryptedReceiver[12:T.inLen+12])
 	if err != nil {
+		fmt.Println("second read")
 		return
 	}
 
@@ -211,10 +212,11 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, control [2]byte, err
 	control[0] = T.encryptedReceiver[2]
 	control[1] = T.encryptedReceiver[3]
 
+	fmt.Println("NONCE:", T.encryptedReceiver[0:12])
 	outputBuffer, err = T.SEAL.AEAD.Open(
 		T.decryptedReceiver[:0],
-		T.encryptedReceiver[4:12],
-		T.encryptedReceiver[12:T.inLen],
+		T.encryptedReceiver[0:12],
+		T.encryptedReceiver[12:T.inLen+12],
 		nil,
 	)
 
@@ -230,11 +232,16 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, control [2]byte, err
 }
 
 func (T *SocketWrapper) Write(data []byte, control [2]byte) (n int, err error) {
+	T.outBuffer[0] = 0
+	T.outBuffer[1] = 0
 	T.outBuffer[2] = control[0]
 	T.outBuffer[3] = control[1]
 
+	fmt.Println("_____________________________________-")
+	fmt.Println("XX:")
 	T.SEAL.NonceInt++
 	binary.BigEndian.PutUint64(T.outBuffer[4:12], T.SEAL.NonceInt)
+	fmt.Println("NONCE:", T.outBuffer[:12])
 
 	T.outData = T.SEAL.AEAD.Seal(
 		T.outBuffer[:12],
@@ -244,20 +251,14 @@ func (T *SocketWrapper) Write(data []byte, control [2]byte) (n int, err error) {
 	)
 
 	binary.BigEndian.PutUint16(T.outData[0:2], uint16(len(T.outData)-12))
-	// T.outLen = len(out) - 2
 
-	// out[0] = byte(T.outLen >> 8)
-	// out[1] = byte(T.outLen)
-
-	// fmt.Println("_____________________________________-")
-	// fmt.Println("XX:")
-	// fmt.Println("NONCE:", T.SEAL.Nonce)
-	// fmt.Println(&T.outBuffer[0])
-	// fmt.Println(T.outBuffer[0:10])
-	// fmt.Println(&out[0])
-	// fmt.Println(out[0:10], "-", len(out))
-	// fmt.Println(binary.BigEndian.Uint16(out[0:2]))
-	// fmt.Println("_____________________________________-")
+	fmt.Println(&T.outBuffer[0])
+	fmt.Println(T.outBuffer[0:12])
+	fmt.Println(&T.outData[0])
+	fmt.Println(T.outData[0:12], "-", len(T.outData))
+	fmt.Println(binary.BigEndian.Uint16(T.outData[0:2]))
+	fmt.Println(T.outData)
+	fmt.Println("_____________________________________-")
 	n, err = T.SOCKET.Write(T.outData)
 	return
 }

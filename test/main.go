@@ -42,14 +42,15 @@ func handleSocket(conn net.Conn) {
 	fmt.Println("SERVER KEY:", T.SEAL.Key)
 
 	for {
+		fmt.Println("FROM CLIENT______________ ")
 		_, decryptedData, control, err := T.Read()
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println("FROM CLIENT >> ")
 		fmt.Println(string(decryptedData))
 		fmt.Println(decryptedData)
 		fmt.Println("CONTROL:", control)
+		fmt.Println("_____________________")
 	}
 }
 
