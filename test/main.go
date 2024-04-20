@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"net"
 	"time"
 
@@ -42,16 +41,15 @@ func handleSocket(conn net.Conn) {
 	}
 	fmt.Println("SERVER KEY:", T.SEAL.Key)
 
-	encryptedBytes := make([]byte, math.MaxUint16)
-	decryptedBytes := make([]byte, math.MaxUint16)
 	for {
-		_, decryptedData, err := T.Read(encryptedBytes, decryptedBytes)
+		_, decryptedData, control, err := T.Read()
 		if err != nil {
 			fmt.Println(err)
 		}
 		fmt.Println("FROM CLIENT >> ")
 		fmt.Println(string(decryptedData))
 		fmt.Println(decryptedData)
+		fmt.Println("CONTROL:", control)
 	}
 }
 
@@ -79,7 +77,7 @@ func newClient() {
 
 	for {
 		time.Sleep(1 * time.Second)
-		_, err = T.Write(data)
+		_, err = T.Write(data, [2]byte{111, 111})
 		if err != nil {
 			fmt.Println(err)
 		}
