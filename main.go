@@ -201,6 +201,7 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, control [2]byte, err
 		T.encryptedReceiver[12:T.inLen+12],
 		int(T.inLen),
 	)
+
 	fmt.Println("2.BUFF:", T.encryptedReceiver[12:T.inLen+12])
 	if err != nil {
 		fmt.Println("second read")
