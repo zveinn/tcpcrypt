@@ -224,7 +224,6 @@ func (T *SocketWrapper) Write(data []byte) (n int, err error) {
 	// fmt.Println(&out[0])
 	// fmt.Println(out[0:10], "-", len(out))
 	// fmt.Println(binary.BigEndian.Uint16(out[0:2]))
-	// fmt.Println("_____________________________________-")
 	n, err = T.SOCKET.Write(out)
 	return
 }
