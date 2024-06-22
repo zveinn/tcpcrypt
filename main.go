@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/chacha20poly1305"
@@ -119,6 +120,11 @@ type SocketWrapper struct {
 	RemotePK *ecdh.PublicKey
 	SEAL     *SEAL
 
+	// Read and Write mutexes
+	WM sync.Mutex
+	// Read mutex is not needed yet.
+	RM sync.Mutex
+
 	// This buffer will be populated with the outgoing
 	// encrypted data
 	outBuffer [66000]byte
@@ -209,6 +215,8 @@ func (T *SocketWrapper) Read() (n int, outputBuffer []byte, err error) {
 }
 
 func (T *SocketWrapper) Write(data []byte) (n int, err error) {
+	T.WM.Lock()
+	defer T.WM.Unlock()
 	out := T.SEAL.AEAD.Seal(T.outBuffer[:2], T.SEAL.Nonce, data, nil)
 	T.outLen = len(out) - 2
 	binary.BigEndian.PutUint16(out[0:2], uint16(T.outLen))
